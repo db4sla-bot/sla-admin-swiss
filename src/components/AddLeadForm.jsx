@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Loader2 } from 'lucide-react';
 
-const AddLeadForm = ({ onSubmit, onCancel }) => {
+const AddLeadForm = ({ onSubmit, onCancel, isSubmitting = false }) => {
   // Get today's date in YYYY-MM-DD format
   const getTodayDate = () => {
     const today = new Date();
@@ -306,11 +306,34 @@ const AddLeadForm = ({ onSubmit, onCancel }) => {
 
       {/* Form Actions */}
       <div className="form-actions">
-        <button type="button" onClick={onCancel} className="swiss-button-outline">
+        <button 
+          type="button" 
+          onClick={onCancel} 
+          className="swiss-button-outline"
+          disabled={isSubmitting}
+        >
           Cancel
         </button>
-        <button type="submit" className="swiss-button">
-          Save Lead
+        <button 
+          type="submit" 
+          className="swiss-button"
+          disabled={isSubmitting}
+          style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            gap: '8px',
+            minWidth: '120px'
+          }}
+        >
+          {isSubmitting ? (
+            <>
+              <Loader2 size={18} className="spinner" />
+              Saving...
+            </>
+          ) : (
+            'Save Lead'
+          )}
         </button>
       </div>
     </form>

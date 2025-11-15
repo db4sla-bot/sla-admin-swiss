@@ -627,6 +627,19 @@ select.swiss-input:disabled {
   }
 }
 
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
 .modal-header {
   padding: var(--spacing-xl);
   border-bottom: 1px solid var(--border-color);

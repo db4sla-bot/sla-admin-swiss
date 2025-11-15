@@ -1,5 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Plus } from 'lucide-react';
+import { collection, addDoc, getDocs, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
+import toast from 'react-hot-toast';
+import { db } from '../config/firebase';
 import Modal from '../components/Modal';
 import AddLeadForm from '../components/AddLeadForm';
 import LeadsSearchFilter from '../components/LeadsSearchFilter';
@@ -18,32 +21,72 @@ const Leads = () => {
     sortBy: 'newest'
   });
   const [currentPage, setCurrentPage] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const itemsPerPage = 24;
 
-  // Load leads from localStorage on mount
+  // Fetch leads from Firebase on mount
   useEffect(() => {
-    const savedLeads = localStorage.getItem('leads');
-    if (savedLeads) {
-      setLeads(JSON.parse(savedLeads));
-    }
+    fetchLeads();
   }, []);
 
-  // Save leads to localStorage whenever they change
-  useEffect(() => {
-    if (leads.length > 0) {
-      localStorage.setItem('leads', JSON.stringify(leads));
+  const fetchLeads = async () => {
+    setIsLoading(true);
+    try {
+      const leadsCollection = collection(db, 'leads');
+      const q = query(leadsCollection, orderBy('createdAt', 'desc'));
+      const querySnapshot = await getDocs(q);
+      const leadsData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setLeads(leadsData);
+    } catch (error) {
+      console.error('Error fetching leads:', error);
+      // Fallback to localStorage
+      const savedLeads = localStorage.getItem('leads');
+      if (savedLeads) {
+        setLeads(JSON.parse(savedLeads));
+      }
+    } finally {
+      setIsLoading(false);
     }
-  }, [leads]);
-
-  const handleAddLead = (lead) => {
-    setLeads(prev => [lead, ...prev]);
-    setIsModalOpen(false);
-    setCurrentPage(1);
   };
 
-  const handleDeleteLead = (leadId) => {
+  const handleAddLead = async (lead) => {
+    setIsSubmitting(true);
+    try {
+      // Add lead to Firebase
+      const docRef = await addDoc(collection(db, 'leads'), lead);
+      
+      // Add to local state with Firebase-generated ID
+      const newLead = {
+        id: docRef.id,
+        ...lead
+      };
+      
+      setLeads(prev => [newLead, ...prev]);
+      setIsModalOpen(false);
+      setCurrentPage(1);
+      toast.success('Lead added successfully!');
+    } catch (error) {
+      console.error('Error adding lead:', error);
+      toast.error('Failed to add lead. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteLead = async (leadId) => {
     if (window.confirm('Are you sure you want to delete this lead?')) {
-      setLeads(prev => prev.filter(l => l.id !== leadId));
+      try {
+        await deleteDoc(doc(db, 'leads', leadId));
+        setLeads(prev => prev.filter(l => l.id !== leadId));
+        toast.success('Lead deleted successfully!');
+      } catch (error) {
+        console.error('Error deleting lead:', error);
+        toast.error('Failed to delete lead. Please try again.');
+      }
     }
   };
 
@@ -148,27 +191,35 @@ const Leads = () => {
       </div>
 
       <div className="page-content">
-        <LeadsSearchFilter
-          searchTerm={searchTerm}
-          onSearchChange={setSearchTerm}
-          filters={filters}
-          onFilterChange={handleFilterChange}
-        />
+        {isLoading ? (
+          <div style={{ textAlign: 'center', padding: '40px', color: '#6B7280' }}>
+            Loading leads...
+          </div>
+        ) : (
+          <>
+            <LeadsSearchFilter
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              filters={filters}
+              onFilterChange={handleFilterChange}
+            />
 
-        <LeadsList
-          leads={paginatedLeads}
-          onEdit={handleEditLead}
-          onDelete={handleDeleteLead}
-        />
+            <LeadsList
+              leads={paginatedLeads}
+              onEdit={handleEditLead}
+              onDelete={handleDeleteLead}
+            />
 
-        {filteredAndSortedLeads.length > 0 && (
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalItems={filteredAndSortedLeads.length}
-            itemsPerPage={itemsPerPage}
-            onPageChange={setCurrentPage}
-          />
+            {filteredAndSortedLeads.length > 0 && (
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={filteredAndSortedLeads.length}
+                itemsPerPage={itemsPerPage}
+                onPageChange={setCurrentPage}
+              />
+            )}
+          </>
         )}
       </div>
 
@@ -181,6 +232,7 @@ const Leads = () => {
         <AddLeadForm
           onSubmit={handleAddLead}
           onCancel={() => setIsModalOpen(false)}
+          isSubmitting={isSubmitting}
         />
       </Modal>
     </div>
