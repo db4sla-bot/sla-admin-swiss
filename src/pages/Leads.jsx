@@ -1,10 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Plus } from 'lucide-react';
-import { collection, addDoc, getDocs, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, updateDoc, setDoc } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import { db } from '../config/firebase';
 import Modal from '../components/Modal';
 import AddLeadForm from '../components/AddLeadForm';
+import EditLeadForm from '../components/EditLeadForm';
+import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import LeadsSearchFilter from '../components/LeadsSearchFilter';
 import LeadsList from '../components/LeadsList';
 import Pagination from '../components/Pagination';
@@ -12,6 +14,9 @@ import Pagination from '../components/Pagination';
 const Leads = () => {
   const [leads, setLeads] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [selectedLead, setSelectedLead] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({
     status: '',
@@ -23,6 +28,7 @@ const Leads = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const itemsPerPage = 24;
 
   // Fetch leads from Firebase on mount
@@ -36,13 +42,17 @@ const Leads = () => {
       const leadsCollection = collection(db, 'leads');
       const q = query(leadsCollection, orderBy('createdAt', 'desc'));
       const querySnapshot = await getDocs(q);
-      const leadsData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const leadsData = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data
+        };
+      });
       setLeads(leadsData);
     } catch (error) {
       console.error('Error fetching leads:', error);
+      console.error('Error details:', error.message);
       // Fallback to localStorage
       const savedLeads = localStorage.getItem('leads');
       if (savedLeads) {
@@ -77,22 +87,87 @@ const Leads = () => {
     }
   };
 
-  const handleDeleteLead = async (leadId) => {
-    if (window.confirm('Are you sure you want to delete this lead?')) {
-      try {
-        await deleteDoc(doc(db, 'leads', leadId));
-        setLeads(prev => prev.filter(l => l.id !== leadId));
-        toast.success('Lead deleted successfully!');
-      } catch (error) {
-        console.error('Error deleting lead:', error);
-        toast.error('Failed to delete lead. Please try again.');
+  const handleEditLead = (lead) => {
+    setSelectedLead(lead);
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdateLead = async (updatedLead) => {
+    setIsSubmitting(true);
+    try {
+      if (!updatedLead.id) {
+        throw new Error('Lead ID is missing');
       }
+
+      const leadId = updatedLead.id;
+      const leadRef = doc(db, 'leads', leadId);
+      
+      // Prepare update data - exclude id field
+      const updateData = {
+        status: updatedLead.status,
+        source: updatedLead.source,
+        subSource: updatedLead.subSource,
+        details: updatedLead.details,
+        requiredServices: updatedLead.requiredServices,
+        customerName: updatedLead.customerName,
+        mobileNumber: updatedLead.mobileNumber,
+        address: updatedLead.address,
+        followUpDate: updatedLead.followUpDate,
+        createdAt: updatedLead.createdAt,
+        updatedAt: new Date().toISOString()
+      };
+      
+      // Use setDoc with merge option as alternative to updateDoc
+      await setDoc(leadRef, updateData, { merge: true });
+      
+      // Update local state
+      setLeads(prev => prev.map(l => l.id === leadId ? { id: leadId, ...updateData } : l));
+      setIsEditModalOpen(false);
+      setSelectedLead(null);
+      toast.success('Lead updated successfully!');
+    } catch (error) {
+      console.error('Error updating lead:', error);
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
+      toast.error(`Failed to update lead: ${error.message}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleEditLead = (lead) => {
-    // TODO: Implement edit functionality
-    console.log('Edit lead:', lead);
+  const handleDeleteClick = (lead) => {
+    setSelectedLead(lead);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!selectedLead) return;
+    
+    setIsDeleting(true);
+    try {
+      if (!selectedLead.id) {
+        throw new Error('Lead ID is missing');
+      }
+
+      const leadId = selectedLead.id;
+      const leadRef = doc(db, 'leads', leadId);
+      
+      // Delete from Firestore
+      await deleteDoc(leadRef);
+      
+      // Update local state
+      setLeads(prev => prev.filter(l => l.id !== leadId));
+      setIsDeleteModalOpen(false);
+      setSelectedLead(null);
+      toast.success('Lead deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting lead:', error);
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
+      toast.error(`Failed to delete lead: ${error.message}`);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleFilterChange = (filterKey, value) => {
@@ -207,7 +282,7 @@ const Leads = () => {
             <LeadsList
               leads={paginatedLeads}
               onEdit={handleEditLead}
-              onDelete={handleDeleteLead}
+              onDelete={handleDeleteClick}
             />
 
             {filteredAndSortedLeads.length > 0 && (
@@ -234,6 +309,51 @@ const Leads = () => {
           onCancel={() => setIsModalOpen(false)}
           isSubmitting={isSubmitting}
         />
+      </Modal>
+
+      <Modal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setSelectedLead(null);
+        }}
+        title="Edit Lead"
+        maxWidth="700px"
+      >
+        {selectedLead && (
+          <EditLeadForm
+            lead={selectedLead}
+            onSubmit={handleUpdateLead}
+            onCancel={() => {
+              setIsEditModalOpen(false);
+              setSelectedLead(null);
+            }}
+            isSubmitting={isSubmitting}
+          />
+        )}
+      </Modal>
+
+      <Modal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setSelectedLead(null);
+        }}
+        title=""
+        maxWidth="500px"
+      >
+        {selectedLead && (
+          <DeleteConfirmModal
+            itemName={selectedLead.customerName}
+            itemType="Lead"
+            onConfirm={handleConfirmDelete}
+            onCancel={() => {
+              setIsDeleteModalOpen(false);
+              setSelectedLead(null);
+            }}
+            isDeleting={isDeleting}
+          />
+        )}
       </Modal>
     </div>
   );
