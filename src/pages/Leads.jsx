@@ -145,6 +145,10 @@ const Leads = () => {
     
     setIsDeleting(true);
     try {
+      // Debug logging
+      console.log('Selected lead for deletion:', selectedLead);
+      console.log('Lead ID:', selectedLead.id);
+      
       if (!selectedLead.id) {
         throw new Error('Lead ID is missing');
       }

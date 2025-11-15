@@ -46,7 +46,7 @@ const LeadsList = ({ leads, onEdit, onDelete }) => {
                 <Edit2 size={16} />
               </button>
               <button
-                onClick={() => onDelete(lead.id)}
+                onClick={() => onDelete(lead)}
                 className="action-button action-delete"
                 aria-label="Delete lead"
               >
