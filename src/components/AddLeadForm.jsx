@@ -2,6 +2,15 @@ import { useState } from 'react';
 import { X } from 'lucide-react';
 
 const AddLeadForm = ({ onSubmit, onCancel }) => {
+  // Get today's date in YYYY-MM-DD format
+  const getTodayDate = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const [formData, setFormData] = useState({
     status: 'New',
     source: '',
@@ -10,7 +19,8 @@ const AddLeadForm = ({ onSubmit, onCancel }) => {
     requiredServices: [],
     customerName: '',
     mobileNumber: '',
-    address: ''
+    address: '',
+    followUpDate: getTodayDate()
   });
 
   const [errors, setErrors] = useState({});
@@ -205,6 +215,22 @@ const AddLeadForm = ({ onSubmit, onCancel }) => {
           className="swiss-input"
           rows="4"
           placeholder="Enter lead details, requirements, notes..."
+        />
+      </div>
+
+      {/* Follow Up Date */}
+      <div className="form-group">
+        <label htmlFor="followUpDate" className="form-label">
+          Follow Up Date
+        </label>
+        <input
+          type="date"
+          id="followUpDate"
+          name="followUpDate"
+          value={formData.followUpDate}
+          onChange={handleChange}
+          min={getTodayDate()}
+          className="swiss-input"
         />
       </div>
 
