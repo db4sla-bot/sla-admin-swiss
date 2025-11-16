@@ -1,0 +1,40 @@
+.main-layout {
+  display: flex;
+  min-height: 100vh;
+  background: #f4f5f7;
+}
+
+.main-content {
+  flex: 1;
+  margin-left: 250px;
+  display: flex;
+  flex-direction: column;
+}
+
+.content-area {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  background: #f4f5f7;
+}
+
+.page {
+  background: white;
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  min-height: calc(100vh - 112px);
+}
+
+.page h1 {
+  font-size: 24px;
+  font-weight: 600;
+  color: #172b4d;
+  margin: 0 0 8px 0;
+}
+
+.page p {
+  color: #5e6c84;
+  font-size: 14px;
+  margin: 0;
+}
